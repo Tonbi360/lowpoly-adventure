@@ -2,7 +2,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 
 
 // ============================================================
-// GAME SETUP
+// BASIC SETUP
 // ============================================================
 
 const canvas = document.getElementById("game-canvas");
@@ -20,25 +20,35 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
 const scene = new THREE.Scene();
 
-scene.background = new THREE.Color(0x87ceeb);
+scene.background = new THREE.Color(0x8bd8f0);
 
 scene.fog = new THREE.Fog(
-    0x87ceeb,
-    45,
-    130
+    0x8bd8f0,
+    55,
+    150
 );
 
+
+// ============================================================
+// CAMERA
+// ============================================================
 
 const camera = new THREE.PerspectiveCamera(
-    60,
+    58,
     window.innerWidth / window.innerHeight,
     0.1,
-    300
+    250
 );
 
-camera.position.set(0, 7, 12);
+camera.position.set(
+    0,
+    8,
+    14
+);
 
 
 // ============================================================
@@ -46,23 +56,23 @@ camera.position.set(0, 7, 12);
 // ============================================================
 
 const skyLight = new THREE.HemisphereLight(
-    0xffffff,
-    0x6d8d52,
-    2.2
+    0xfff7df,
+    0x668052,
+    2.4
 );
 
 scene.add(skyLight);
 
 
 const sun = new THREE.DirectionalLight(
-    0xfff4d6,
-    3.2
+    0xfff1c7,
+    3.5
 );
 
 sun.position.set(
-    25,
+    -25,
     35,
-    15
+    20
 );
 
 sun.castShadow = true;
@@ -70,10 +80,10 @@ sun.castShadow = true;
 sun.shadow.mapSize.width = 1024;
 sun.shadow.mapSize.height = 1024;
 
-sun.shadow.camera.left = -50;
-sun.shadow.camera.right = 50;
-sun.shadow.camera.top = 50;
-sun.shadow.camera.bottom = -50;
+sun.shadow.camera.left = -45;
+sun.shadow.camera.right = 45;
+sun.shadow.camera.top = 45;
+sun.shadow.camera.bottom = -45;
 
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 120;
@@ -86,90 +96,382 @@ scene.add(sun);
 // ============================================================
 
 const grassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x76b852,
+    color: 0x79b94e,
+    flatShading: true
+});
+
+const grassLightMaterial = new THREE.MeshStandardMaterial({
+    color: 0x91cc5d,
+    flatShading: true
+});
+
+const cliffMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7d745f,
     flatShading: true
 });
 
 const dirtMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8c6745,
+    color: 0xc69a61,
     flatShading: true
 });
 
 const rockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x7d8279,
+    color: 0x77786f,
     flatShading: true
 });
 
 const darkRockMaterial = new THREE.MeshStandardMaterial({
-    color: 0x555b54,
+    color: 0x5d625b,
     flatShading: true
 });
 
-const treeTrunkMaterial = new THREE.MeshStandardMaterial({
-    color: 0x735033,
+const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x765035,
     flatShading: true
 });
 
-const treeLeafMaterial = new THREE.MeshStandardMaterial({
-    color: 0x3f813b,
+const leafMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3e873d,
+    flatShading: true
+});
+
+const leafLightMaterial = new THREE.MeshStandardMaterial({
+    color: 0x65a847,
     flatShading: true
 });
 
 
 // ============================================================
-// MAIN ISLAND
+// WORLD GROUP
 // ============================================================
 
-const islandGroup = new THREE.Group();
+const world = new THREE.Group();
 
-scene.add(islandGroup);
-
-
-// Top of island
-
-const islandTopGeometry = new THREE.CylinderGeometry(
-    24,
-    27,
-    2.5,
-    12
-);
-
-const islandTop = new THREE.Mesh(
-    islandTopGeometry,
-    grassMaterial
-);
-
-islandTop.position.y = -1.25;
-
-islandTop.receiveShadow = true;
-
-islandGroup.add(islandTop);
-
-
-// Dirt/rock underside
-
-const islandBaseGeometry = new THREE.CylinderGeometry(
-    27,
-    20,
-    9,
-    12
-);
-
-const islandBase = new THREE.Mesh(
-    islandBaseGeometry,
-    dirtMaterial
-);
-
-islandBase.position.y = -6.5;
-
-islandBase.castShadow = true;
-islandBase.receiveShadow = true;
-
-islandGroup.add(islandBase);
+scene.add(world);
 
 
 // ============================================================
-// ROCKS
+// WATER
+// ============================================================
+
+const waterGeometry = new THREE.CircleGeometry(
+    90,
+    48
+);
+
+const waterMaterial = new THREE.MeshStandardMaterial({
+    color: 0x55b9d2,
+    roughness: 0.85,
+    metalness: 0
+});
+
+const water = new THREE.Mesh(
+    waterGeometry,
+    waterMaterial
+);
+
+water.rotation.x = -Math.PI / 2;
+water.position.y = -5.8;
+
+world.add(water);
+
+
+// ============================================================
+// ISLAND TERRAIN
+// ============================================================
+
+function createIsland() {
+
+    const segments = 16;
+    const rings = 4;
+
+    const vertices = [];
+    const indices = [];
+
+    const centerHeight = 1.0;
+
+    // Center vertex
+    vertices.push(
+        0,
+        centerHeight,
+        0
+    );
+
+    // Terrain rings
+    for (let ring = 1; ring <= rings; ring++) {
+
+        const radius = ring * 5.3;
+
+        for (let i = 0; i < segments; i++) {
+
+            const angle =
+                (i / segments) * Math.PI * 2;
+
+            const variation =
+                1 +
+                Math.sin(angle * 3.0) * 0.06 +
+                Math.sin(angle * 5.0) * 0.035;
+
+            const x = Math.cos(angle) * radius * variation;
+            const z = Math.sin(angle) * radius * variation;
+
+            let y;
+
+            if (ring === 1) {
+                y = 0.8;
+            } else if (ring === 2) {
+                y = 0.5;
+            } else if (ring === 3) {
+                y = 0.1;
+            } else {
+                y = -0.6;
+            }
+
+            // A few natural height variations
+            y += Math.sin(
+                angle * 4 + ring
+            ) * 0.12;
+
+            vertices.push(
+                x,
+                y,
+                z
+            );
+        }
+    }
+
+    // Center to first ring
+    for (let i = 0; i < segments; i++) {
+
+        const next = (i + 1) % segments;
+
+        indices.push(
+            0,
+            1 + i,
+            1 + next
+        );
+    }
+
+    // Ring connections
+    for (let ring = 1; ring < rings; ring++) {
+
+        const currentStart =
+            1 + (ring - 1) * segments;
+
+        const nextStart =
+            1 + ring * segments;
+
+        for (let i = 0; i < segments; i++) {
+
+            const next =
+                (i + 1) % segments;
+
+            const a = currentStart + i;
+            const b = currentStart + next;
+            const c = nextStart + i;
+            const d = nextStart + next;
+
+            indices.push(
+                a, c, b,
+                b, c, d
+            );
+        }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(
+            vertices,
+            3
+        )
+    );
+
+    geometry.setIndex(indices);
+
+    geometry.computeVertexNormals();
+
+    const island = new THREE.Mesh(
+        geometry,
+        grassMaterial
+    );
+
+    island.receiveShadow = true;
+
+    world.add(island);
+
+    return island;
+}
+
+createIsland();
+
+
+// ============================================================
+// CLIFF SIDES
+// ============================================================
+
+function createCliffRing() {
+
+    const segments = 16;
+    const topRadius = 21.2;
+    const bottomRadius = 19.2;
+
+    const vertices = [];
+    const indices = [];
+
+    for (let i = 0; i < segments; i++) {
+
+        const angle =
+            (i / segments) * Math.PI * 2;
+
+        const variation =
+            1 +
+            Math.sin(angle * 3) * 0.06;
+
+        const xTop =
+            Math.cos(angle) *
+            topRadius *
+            variation;
+
+        const zTop =
+            Math.sin(angle) *
+            topRadius *
+            variation;
+
+        const xBottom =
+            Math.cos(angle) *
+            bottomRadius *
+            variation;
+
+        const zBottom =
+            Math.sin(angle) *
+            bottomRadius *
+            variation;
+
+        vertices.push(
+            xTop,
+            -0.65,
+            zTop
+        );
+
+        vertices.push(
+            xBottom,
+            -5.7,
+            zBottom
+        );
+    }
+
+    for (let i = 0; i < segments; i++) {
+
+        const next =
+            (i + 1) % segments;
+
+        const topA = i * 2;
+        const bottomA = i * 2 + 1;
+
+        const topB = next * 2;
+        const bottomB = next * 2 + 1;
+
+        indices.push(
+            topA,
+            bottomA,
+            topB,
+
+            topB,
+            bottomA,
+            bottomB
+        );
+    }
+
+    const geometry = new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(
+            vertices,
+            3
+        )
+    );
+
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const cliff = new THREE.Mesh(
+        geometry,
+        cliffMaterial
+    );
+
+    cliff.receiveShadow = true;
+    cliff.castShadow = true;
+
+    world.add(cliff);
+}
+
+createCliffRing();
+
+
+// ============================================================
+// PATH
+// ============================================================
+
+function createPath() {
+
+    const points = [
+        new THREE.Vector3(0, 0.87, 10),
+        new THREE.Vector3(0, 0.89, 7),
+        new THREE.Vector3(-0.3, 0.9, 4),
+        new THREE.Vector3(-0.8, 0.9, 1),
+        new THREE.Vector3(-1.1, 0.8, -2),
+        new THREE.Vector3(-0.5, 0.65, -5),
+        new THREE.Vector3(1.2, 0.45, -8),
+        new THREE.Vector3(2.5, 0.2, -11)
+    ];
+
+    const pathGroup = new THREE.Group();
+
+    world.add(pathGroup);
+
+    for (let i = 0; i < points.length - 1; i++) {
+
+        const a = points[i];
+        const b = points[i + 1];
+
+        const midpoint =
+            new THREE.Vector3()
+                .addVectors(a, b)
+                .multiplyScalar(0.5);
+
+        const distance =
+            a.distanceTo(b);
+
+        const geometry =
+            new THREE.BoxGeometry(
+                3.2,
+                0.08,
+                distance
+            );
+
+        const piece = new THREE.Mesh(
+            geometry,
+            dirtMaterial
+        );
+
+        piece.position.copy(midpoint);
+
+        piece.lookAt(b.x, midpoint.y, b.z);
+
+        piece.receiveShadow = true;
+
+        pathGroup.add(piece);
+    }
+}
+
+createPath();
+
+
+// ============================================================
+// ROCK
 // ============================================================
 
 function createRock(
@@ -179,17 +481,23 @@ function createRock(
     scale = 1,
     material = rockMaterial
 ) {
-    const geometry = new THREE.DodecahedronGeometry(
-        1,
-        0
-    );
+
+    const geometry =
+        new THREE.DodecahedronGeometry(
+            1,
+            0
+        );
 
     const rock = new THREE.Mesh(
         geometry,
         material
     );
 
-    rock.position.set(x, y, z);
+    rock.position.set(
+        x,
+        y,
+        z
+    );
 
     rock.scale.set(
         scale * 1.4,
@@ -198,153 +506,324 @@ function createRock(
     );
 
     rock.rotation.set(
-        Math.random(),
-        Math.random(),
-        Math.random()
+        Math.random() * 0.5,
+        Math.random() * Math.PI,
+        Math.random() * 0.5
     );
 
     rock.castShadow = true;
     rock.receiveShadow = true;
 
-    islandGroup.add(rock);
+    world.add(rock);
 
     return rock;
 }
 
 
-// Rocks around the island
+// Foreground rocks
 
-createRock(-13, 0.1, -7, 1.3);
-createRock(-16, 0.1, -2, 0.8);
-createRock(-11, 0.1, 7, 1.1);
+createRock(-6, 0.95, 7, 0.7);
+createRock(6, 0.9, 8, 0.9);
+createRock(-8, 0.65, 1, 0.8);
+createRock(8, 0.65, 0, 1.0);
 
-createRock(14, 0.1, -8, 1.5);
-createRock(17, 0.1, 0, 0.9);
-createRock(13, 0.1, 8, 1.3);
+createRock(-5, 0.5, -8, 1.2);
+createRock(7, 0.35, -9, 0.9);
 
-createRock(-4, 0.1, -12, 0.7);
-createRock(5, 0.1, -13, 1.2);
+createRock(-15, -0.1, -3, 1.5);
+createRock(14, -0.1, 5, 1.4);
 
-createRock(-19, -1, 9, 1.8, darkRockMaterial);
-createRock(19, -1, 9, 1.6, darkRockMaterial);
+createRock(
+    -17,
+    -1,
+    10,
+    1.8,
+    darkRockMaterial
+);
+
+createRock(
+    17,
+    -1,
+    -7,
+    1.7,
+    darkRockMaterial
+);
 
 
 // ============================================================
-// TREES
+// TREE
 // ============================================================
 
-function createTree(x, y, z, scale = 1) {
+function createTree(
+    x,
+    y,
+    z,
+    scale = 1,
+    lightLeaves = false
+) {
 
     const tree = new THREE.Group();
 
-    tree.position.set(x, y, z);
-    tree.scale.setScalar(scale);
+    tree.position.set(
+        x,
+        y,
+        z
+    );
 
+    tree.scale.setScalar(scale);
 
     // Trunk
 
-    const trunkGeometry = new THREE.CylinderGeometry(
-        0.28,
-        0.42,
-        2.5,
-        6
-    );
+    const trunkGeometry =
+        new THREE.CylinderGeometry(
+            0.25,
+            0.4,
+            2.6,
+            6
+        );
 
     const trunk = new THREE.Mesh(
         trunkGeometry,
-        treeTrunkMaterial
+        trunkMaterial
     );
 
-    trunk.position.y = 1.25;
+    trunk.position.y = 1.3;
 
     trunk.castShadow = true;
 
     tree.add(trunk);
 
 
-    // Bottom foliage
+    // Lower leaves
 
-    const bottomGeometry = new THREE.ConeGeometry(
-        1.8,
-        2.8,
-        7
+    const lowerGeometry =
+        new THREE.ConeGeometry(
+            1.9,
+            2.8,
+            7
+        );
+
+    const lower = new THREE.Mesh(
+        lowerGeometry,
+        lightLeaves
+            ? leafLightMaterial
+            : leafMaterial
     );
 
-    const bottomLeaves = new THREE.Mesh(
-        bottomGeometry,
-        treeLeafMaterial
-    );
+    lower.position.y = 3;
 
-    bottomLeaves.position.y = 3;
+    lower.castShadow = true;
 
-    bottomLeaves.castShadow = true;
-
-    tree.add(bottomLeaves);
+    tree.add(lower);
 
 
-    // Middle foliage
+    // Middle leaves
 
-    const middleGeometry = new THREE.ConeGeometry(
-        1.4,
-        2.4,
-        7
-    );
+    const middleGeometry =
+        new THREE.ConeGeometry(
+            1.45,
+            2.5,
+            7
+        );
 
-    const middleLeaves = new THREE.Mesh(
+    const middle = new THREE.Mesh(
         middleGeometry,
-        treeLeafMaterial
+        leafMaterial
     );
 
-    middleLeaves.position.y = 4.4;
+    middle.position.y = 4.4;
 
-    middleLeaves.castShadow = true;
+    middle.castShadow = true;
 
-    tree.add(middleLeaves);
+    tree.add(middle);
 
 
-    // Top foliage
+    // Top
 
-    const topGeometry = new THREE.ConeGeometry(
-        0.9,
-        2,
-        7
-    );
+    const topGeometry =
+        new THREE.ConeGeometry(
+            0.9,
+            2.1,
+            7
+        );
 
-    const topLeaves = new THREE.Mesh(
+    const top = new THREE.Mesh(
         topGeometry,
-        treeLeafMaterial
+        lightLeaves
+            ? leafLightMaterial
+            : leafMaterial
     );
 
-    topLeaves.position.y = 5.5;
+    top.position.y = 5.7;
 
-    topLeaves.castShadow = true;
+    top.castShadow = true;
 
-    tree.add(topLeaves);
+    tree.add(top);
 
 
-    islandGroup.add(tree);
+    world.add(tree);
 
     return tree;
 }
 
 
-// Forest areas
+// Forest clusters
 
-createTree(-8, 0, -5, 1.1);
-createTree(-11, 0, -3, 0.9);
-createTree(-14, 0, -6, 1.3);
+createTree(-9, 0.8, 5, 1.0);
+createTree(-11, 0.6, 7, 0.8, true);
+createTree(-13, 0.35, 4, 1.2);
 
-createTree(-9, 0, 7, 1.2);
-createTree(-13, 0, 8, 0.8);
-createTree(-16, 0, 6, 1.1);
+createTree(-10, 0.55, -2, 1.1, true);
+createTree(-12, 0.4, -5, 0.9);
+createTree(-14, 0.2, -7, 1.3);
 
-createTree(9, 0, -5, 1.2);
-createTree(12, 0, -7, 0.9);
-createTree(15, 0, -4, 1.3);
+createTree(9, 0.8, 5, 1.2);
+createTree(11, 0.55, 7, 0.8, true);
+createTree(13, 0.35, 4, 1.1);
 
-createTree(10, 0, 7, 1);
-createTree(14, 0, 6, 1.2);
-createTree(17, 0, 7, 0.8);
+createTree(9, 0.7, -3, 1.0, true);
+createTree(12, 0.45, -5, 1.3);
+createTree(14, 0.15, -3, 0.9);
+
+
+// ============================================================
+// VILLAGE HOUSE
+// ============================================================
+
+function createHouse() {
+
+    const house = new THREE.Group();
+
+    house.position.set(
+        -1.5,
+        0.75,
+        -7
+    );
+
+    // Main building
+
+    const wallGeometry =
+        new THREE.BoxGeometry(
+            5,
+            3,
+            4
+        );
+
+    const wallMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0xe2c795,
+            flatShading: true
+        });
+
+    const walls = new THREE.Mesh(
+        wallGeometry,
+        wallMaterial
+    );
+
+    walls.position.y = 1.5;
+
+    walls.castShadow = true;
+    walls.receiveShadow = true;
+
+    house.add(walls);
+
+
+    // Roof
+
+    const roofGeometry =
+        new THREE.ConeGeometry(
+            3.8,
+            2.8,
+            4
+        );
+
+    const roofMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0xc86f45,
+            flatShading: true
+        });
+
+    const roof = new THREE.Mesh(
+        roofGeometry,
+        roofMaterial
+    );
+
+    roof.position.y = 4.4;
+
+    roof.rotation.y =
+        Math.PI / 4;
+
+    roof.castShadow = true;
+
+    house.add(roof);
+
+
+    // Door
+
+    const doorGeometry =
+        new THREE.BoxGeometry(
+            1.05,
+            1.9,
+            0.15
+        );
+
+    const doorMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x704832,
+            flatShading: true
+        });
+
+    const door = new THREE.Mesh(
+        doorGeometry,
+        doorMaterial
+    );
+
+    door.position.set(
+        0,
+        0.95,
+        2.08
+    );
+
+    door.castShadow = true;
+
+    house.add(door);
+
+
+    // Window
+
+    const windowGeometry =
+        new THREE.BoxGeometry(
+            1.1,
+            1,
+            0.12
+        );
+
+    const windowMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x7ed0df,
+            flatShading: true,
+            emissive: 0x204b52,
+            emissiveIntensity: 0.3
+        });
+
+    const window = new THREE.Mesh(
+        windowGeometry,
+        windowMaterial
+    );
+
+    window.position.set(
+        -1.5,
+        1.8,
+        2.08
+    );
+
+    house.add(window);
+
+
+    world.add(house);
+}
+
+createHouse();
 
 
 // ============================================================
@@ -353,22 +832,25 @@ createTree(17, 0, 7, 0.8);
 
 function createMountain(
     x,
+    y,
     z,
     height,
-    width,
+    radius,
     color
 ) {
 
-    const geometry = new THREE.ConeGeometry(
-        width,
-        height,
-        6
-    );
+    const geometry =
+        new THREE.ConeGeometry(
+            radius,
+            height,
+            6
+        );
 
-    const material = new THREE.MeshStandardMaterial({
-        color,
-        flatShading: true
-    });
+    const material =
+        new THREE.MeshStandardMaterial({
+            color,
+            flatShading: true
+        });
 
     const mountain = new THREE.Mesh(
         geometry,
@@ -377,42 +859,53 @@ function createMountain(
 
     mountain.position.set(
         x,
-        height / 2 - 1,
+        y + height / 2,
         z
     );
 
-    mountain.rotation.y = Math.random();
+    mountain.rotation.y =
+        Math.random();
 
     mountain.castShadow = true;
 
-    scene.add(mountain);
-
-    return mountain;
+    world.add(mountain);
 }
 
 
 createMountain(
+    -42,
+    -5,
     -45,
-    -35,
-    30,
-    15,
-    0x607866
+    32,
+    17,
+    0x66836c
 );
 
 createMountain(
-    40,
-    -45,
-    38,
-    18,
-    0x536b5b
+    -15,
+    -5,
+    -58,
+    43,
+    21,
+    0x587761
 );
 
 createMountain(
+    22,
     -5,
     -55,
-    45,
-    22,
-    0x4d6657
+    35,
+    18,
+    0x5f7d67
+);
+
+createMountain(
+    48,
+    -5,
+    -35,
+    28,
+    15,
+    0x6b886e
 );
 
 
@@ -424,33 +917,111 @@ const player = new THREE.Group();
 
 player.position.set(
     0,
-    0,
-    5
+    0.9,
+    8
 );
 
-scene.add(player);
+world.add(player);
+
+
+// Legs
+
+const legMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x35445a,
+        flatShading: true
+    });
+
+function createLeg(x) {
+
+    const geometry =
+        new THREE.CylinderGeometry(
+            0.18,
+            0.23,
+            0.9,
+            6
+        );
+
+    const leg = new THREE.Mesh(
+        geometry,
+        legMaterial
+    );
+
+    leg.position.set(
+        x,
+        0.45,
+        0
+    );
+
+    leg.castShadow = true;
+
+    player.add(leg);
+
+    return leg;
+}
+
+createLeg(-0.25);
+createLeg(0.25);
+
+
+// Boots
+
+const bootMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x49372d,
+        flatShading: true
+    });
+
+function createBoot(x) {
+
+    const geometry =
+        new THREE.BoxGeometry(
+            0.4,
+            0.28,
+            0.65
+        );
+
+    const boot = new THREE.Mesh(
+        geometry,
+        bootMaterial
+    );
+
+    boot.position.set(
+        x,
+        0.08,
+        -0.12
+    );
+
+    boot.castShadow = true;
+
+    player.add(boot);
+}
+
+createBoot(-0.25);
+createBoot(0.25);
 
 
 // Body
 
-const bodyGeometry = new THREE.CapsuleGeometry(
-    0.45,
-    0.9,
-    4,
-    8
-);
+const bodyGeometry =
+    new THREE.BoxGeometry(
+        0.9,
+        1.15,
+        0.6
+    );
 
-const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0x315b86,
-    flatShading: true
-});
+const bodyMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x3d6686,
+        flatShading: true
+    });
 
 const body = new THREE.Mesh(
     bodyGeometry,
     bodyMaterial
 );
 
-body.position.y = 1.1;
+body.position.y = 1.35;
 
 body.castShadow = true;
 
@@ -459,40 +1030,74 @@ player.add(body);
 
 // Head
 
-const headGeometry = new THREE.IcosahedronGeometry(
-    0.55,
-    1
-);
+const headGeometry =
+    new THREE.IcosahedronGeometry(
+        0.58,
+        1
+    );
 
-const headMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe0a46f,
-    flatShading: true
-});
+const skinMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xe0a46f,
+        flatShading: true
+    });
 
 const head = new THREE.Mesh(
     headGeometry,
-    headMaterial
+    skinMaterial
 );
 
-head.position.y = 2;
+head.position.y = 2.3;
 
 head.castShadow = true;
 
 player.add(head);
 
 
-// Backpack
+// Hair
 
-const backpackGeometry = new THREE.BoxGeometry(
-    0.7,
-    0.8,
-    0.3
+const hairGeometry =
+    new THREE.ConeGeometry(
+        0.58,
+        0.7,
+        6
+    );
+
+const hairMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x294a63,
+        flatShading: true
+    });
+
+const hair = new THREE.Mesh(
+    hairGeometry,
+    hairMaterial
 );
 
-const backpackMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8a5138,
-    flatShading: true
-});
+hair.position.y = 2.75;
+
+hair.rotation.y =
+    Math.PI / 6;
+
+hair.castShadow = true;
+
+player.add(hair);
+
+
+// Backpack
+
+const backpackGeometry =
+    new THREE.BoxGeometry(
+        0.75,
+        0.9,
+        0.35
+    );
+
+const backpackMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x8c5338,
+        flatShading: true
+    });
 
 const backpack = new THREE.Mesh(
     backpackGeometry,
@@ -501,8 +1106,8 @@ const backpack = new THREE.Mesh(
 
 backpack.position.set(
     0,
-    1.15,
-    0.45
+    1.4,
+    -0.45
 );
 
 backpack.castShadow = true;
@@ -511,37 +1116,37 @@ player.add(backpack);
 
 
 // ============================================================
-// CAMERA TARGET
-// ============================================================
-
-const cameraOffset = new THREE.Vector3(
-    0,
-    6,
-    11
-);
-
-
-// ============================================================
 // CAMERA FOLLOW
 // ============================================================
 
+const cameraOffset =
+    new THREE.Vector3(
+        0,
+        7,
+        12
+    );
+
 function updateCamera() {
 
-    const targetPosition = player.position
-        .clone()
-        .add(cameraOffset);
+    const target =
+        player.position
+            .clone()
+            .add(cameraOffset);
 
     camera.position.lerp(
-        targetPosition,
+        target,
         0.08
     );
 
-    const lookTarget = player.position
-        .clone();
+    const lookTarget =
+        player.position
+            .clone();
 
-    lookTarget.y += 1;
+    lookTarget.y += 1.3;
 
-    camera.lookAt(lookTarget);
+    camera.lookAt(
+        lookTarget
+    );
 }
 
 
@@ -551,64 +1156,25 @@ function updateCamera() {
 
 function resize() {
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const width =
+        window.innerWidth;
 
-    camera.aspect = width / height;
+    const height =
+        window.innerHeight;
+
+    camera.aspect =
+        width / height;
 
     camera.updateProjectionMatrix();
 
     renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio, 1.5)
+        Math.min(
+            window.devicePixelRatio,
+            1.5
+        )
     );
 
     renderer.setSize(
         width,
         height
-    );
-}
-
-window.addEventListener(
-    "resize",
-    resize
-);
-
-
-// ============================================================
-// GAME LOOP
-// ============================================================
-
-const clock = new THREE.Clock();
-
-function animate() {
-
-    requestAnimationFrame(animate);
-
-    const delta = clock.getDelta();
-
-    // Tiny idle animation.
-    // We'll replace this with proper animation later.
-
-    player.position.y =
-        Math.sin(performance.now() * 0.002) * 0.03;
-
-    updateCamera();
-
-    renderer.render(
-        scene,
-        camera
-    );
-}
-
-animate();
-
-
-// ============================================================
-// BOOT
-// ============================================================
-
-setTimeout(() => {
-
-    loadingScreen.style.display = "none";
-
-}, 900);
+   
